@@ -9,6 +9,7 @@ const currentFixedSoundText = document.getElementById("currentFixedSound");
 const soundCountText = document.getElementById("soundCount");
 const libraryMessage = document.getElementById("libraryMessage");
 const libraryList = document.getElementById("libraryList");
+const electronAPI = window.electronAPI;
 
 let removeMainListener = null;
 let appState = {
@@ -27,6 +28,19 @@ let appState = {
     soundCount: 0
   }
 };
+
+function hasRequiredElectronAPI() {
+  return Boolean(
+    electronAPI &&
+      typeof electronAPI.getAppState === "function" &&
+      typeof electronAPI.refreshSoundLibrary === "function" &&
+      typeof electronAPI.playSound === "function" &&
+      typeof electronAPI.playCurrentMode === "function" &&
+      typeof electronAPI.setMode === "function" &&
+      typeof electronAPI.setFixedSound === "function" &&
+      typeof electronAPI.onPlaySoundRequested === "function"
+  );
+}
 
 /**
  * Speelt een lokaal MP3-bestand af uit ./sounds.
@@ -108,7 +122,7 @@ function createSoundCard(filename) {
   playTestButton.type = "button";
   playTestButton.textContent = "Play/Test";
   playTestButton.addEventListener("click", async () => {
-    const result = await window.electronAPI.playSound(filename);
+    const result = await electronAPI.playSound(filename);
     if (!result.ok) {
       setStatus(result.error, true);
     }
@@ -120,7 +134,7 @@ function createSoundCard(filename) {
   setFixedButton.className = "secondary";
   setFixedButton.textContent = "Instellen als vast geluid";
   setFixedButton.addEventListener("click", async () => {
-    const result = await window.electronAPI.setFixedSound(filename);
+    const result = await electronAPI.setFixedSound(filename);
     if (!result.ok) {
       setStatus(result.error, true);
       return;
@@ -155,56 +169,63 @@ function renderUI() {
 }
 
 async function refreshAppState() {
-  appState = await window.electronAPI.refreshSoundLibrary();
+  appState = await electronAPI.refreshSoundLibrary();
   renderUI();
 }
 
-playButton.addEventListener("click", async () => {
-  const result = await window.electronAPI.playCurrentMode();
-  if (!result.ok) {
-    setStatus(result.error, true);
-  }
-});
+function disableInteractiveUI() {
+  playButton.disabled = true;
+  refreshButton.disabled = true;
+  modeFixedInput.disabled = true;
+  modeRandomInput.disabled = true;
+}
 
-refreshButton.addEventListener("click", async () => {
-  await refreshAppState();
-  setStatus("Geluidsbibliotheek vernieuwd.", false);
-});
+function bindUIEvents() {
+  playButton.addEventListener("click", async () => {
+    const result = await electronAPI.playCurrentMode();
+    if (!result.ok) {
+      setStatus(result.error, true);
+    }
+  });
 
-modeFixedInput.addEventListener("change", async () => {
-  if (!modeFixedInput.checked) {
-    return;
-  }
+  refreshButton.addEventListener("click", async () => {
+    await refreshAppState();
+    setStatus("Geluidsbibliotheek vernieuwd.", false);
+  });
 
-  const result = await window.electronAPI.setMode("fixed");
-  if (!result.ok) {
-    setStatus(result.error, true);
-    return;
-  }
+  modeFixedInput.addEventListener("change", async () => {
+    if (!modeFixedInput.checked) {
+      return;
+    }
 
-  appState = result.state;
-  renderUI();
-  setStatus("Modus ingesteld op: Vast geluid.", false);
-});
+    const result = await electronAPI.setMode("fixed");
+    if (!result.ok) {
+      setStatus(result.error, true);
+      return;
+    }
 
-modeRandomInput.addEventListener("change", async () => {
-  if (!modeRandomInput.checked) {
-    return;
-  }
+    appState = result.state;
+    renderUI();
+    setStatus("Modus ingesteld op: Vast geluid.", false);
+  });
 
-  const result = await window.electronAPI.setMode("random");
-  if (!result.ok) {
-    setStatus(result.error, true);
-    return;
-  }
+  modeRandomInput.addEventListener("change", async () => {
+    if (!modeRandomInput.checked) {
+      return;
+    }
 
-  appState = result.state;
-  renderUI();
-  setStatus("Modus ingesteld op: Random.", false);
-});
+    const result = await electronAPI.setMode("random");
+    if (!result.ok) {
+      setStatus(result.error, true);
+      return;
+    }
 
-if (window.electronAPI && typeof window.electronAPI.onPlaySoundRequested === "function") {
-  removeMainListener = window.electronAPI.onPlaySoundRequested((payload) => {
+    appState = result.state;
+    renderUI();
+    setStatus("Modus ingesteld op: Random.", false);
+  });
+
+  removeMainListener = electronAPI.onPlaySoundRequested((payload) => {
     if (!payload || !payload.ok) {
       const errorMessage = payload && payload.error ? payload.error : "Onbekende afspeelfout.";
       setStatus(errorMessage, true);
@@ -214,12 +235,21 @@ if (window.electronAPI && typeof window.electronAPI.onPlaySoundRequested === "fu
     const source = payload.source || "main process";
     playSound(payload.filename, source);
   });
-} else {
-  console.warn("electronAPI.onPlaySoundRequested is niet beschikbaar.");
 }
 
 async function init() {
-  appState = await window.electronAPI.getAppState();
+  if (!hasRequiredElectronAPI()) {
+    disableInteractiveUI();
+    setStatus(
+      "Initialisatie mislukt: preload/IPC API niet beschikbaar. Herstart de app volledig.",
+      true
+    );
+    console.error("electronAPI ontbreekt of is onvolledig:", electronAPI);
+    return;
+  }
+
+  bindUIEvents();
+  appState = await electronAPI.getAppState();
   renderUI();
   setStatus("Klaar.", false);
 }

@@ -23,11 +23,16 @@ function createWindow() {
       // Veilig: renderer krijgt alleen beperkte API via preload.
       nodeIntegration: false,
       contextIsolation: true,
+      // In sommige Windows omgevingen voorkomt dit preload-initialisatieproblemen.
+      sandbox: false,
       preload: path.join(__dirname, "preload.js")
     }
   });
 
   mainWindow.loadFile(path.join(__dirname, "index.html"));
+  mainWindow.webContents.on("preload-error", (_event, preloadPath, error) => {
+    console.error(`Preload-fout in ${preloadPath}:`, error);
+  });
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
