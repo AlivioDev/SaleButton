@@ -38,10 +38,27 @@ function invokeWithTimeout(channel, ...args) {
 
 async function invokeWithFallback(channel, ...args) {
   try {
-    return await invokeWithTimeout(channel, ...args);
+    const syncResult = ipcRenderer.sendSync(`${channel}:sync`, ...args);
+    if (syncResult !== undefined) {
+      return syncResult;
+    }
+  } catch (_syncError) {
+    // Ga door naar invoke-pad.
+  }
+
+  try {
+    const invokeResult = await invokeWithTimeout(channel, ...args);
+    if (invokeResult === undefined) {
+      throw new Error(`Lege IPC-respons op kanaal: ${channel}`);
+    }
+    return invokeResult;
   } catch (invokeError) {
     try {
-      return ipcRenderer.sendSync(`${channel}:sync`, ...args);
+      const syncFallbackResult = ipcRenderer.sendSync(`${channel}:sync`, ...args);
+      if (syncFallbackResult === undefined) {
+        throw new Error(`Lege sync fallback-respons op kanaal: ${channel}`);
+      }
+      return syncFallbackResult;
     } catch (syncError) {
       throw new Error(
         `IPC invoke + fallback mislukt voor ${channel}: ${invokeError.message}; ${syncError.message}`
