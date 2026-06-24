@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>USB knop geluid test</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>USB knop geluid test</h1>
+      <p>
+        Klik op de knop hieronder of druk op de <code>`</code>-toets om hetzelfde
+        geluid af te spelen.
+      </p>
+
+      <button id="playButton" type="button">Test geluid</button>
+      <p id="status" aria-live="polite">Klaar.</p>
+
+      <!-- Lokaal geluid uit /sounds -->
+      <audio id="sound" src="./sounds/click.mp3" preload="auto"></audio>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
