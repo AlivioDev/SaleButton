@@ -1,0 +1,15 @@
+{
+  "name": "usb-button-sound-app",
+  "version": "1.0.0",
+  "description": "Simple Electron app that plays a local MP3 on button click or backquote key press.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^37.0.0"
+  }
+}
