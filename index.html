@@ -10,15 +10,44 @@
     <main class="container">
       <h1>USB knop geluid test</h1>
       <p>
-        Klik op de knop hieronder of druk op de <code>`</code>-toets om hetzelfde
-        geluid af te spelen.
+        De USB-knop stuurt de <code>`</code>-toets. Via globalShortcut werkt dat
+        ook als dit venster niet actief is.
       </p>
 
-      <button id="playButton" type="button">Test geluid</button>
-      <p id="status" aria-live="polite">Klaar.</p>
+      <section class="panel">
+        <h2>Afspeelmodus</h2>
+        <div class="mode-row">
+          <label>
+            <input type="radio" name="mode" value="fixed" id="modeFixed" />
+            Vast geluid
+          </label>
+          <label>
+            <input type="radio" name="mode" value="random" id="modeRandom" />
+            Random
+          </label>
+        </div>
 
-      <!-- Lokaal geluid uit /sounds -->
-      <audio id="sound" src="./sounds/click.mp3" preload="auto"></audio>
+        <button id="playButton" type="button">Test huidige modus</button>
+      </section>
+
+      <section class="panel summary">
+        <h2>Huidige status</h2>
+        <p><strong>Modus:</strong> <span id="currentMode">-</span></p>
+        <p><strong>Vast geluid:</strong> <span id="currentFixedSound">-</span></p>
+        <p><strong>Aantal MP3-bestanden:</strong> <span id="soundCount">0</span></p>
+      </section>
+
+      <section class="panel">
+        <div class="library-header">
+          <h2>Geluidsbibliotheek</h2>
+          <button id="refreshButton" type="button" class="secondary">Vernieuwen</button>
+        </div>
+        <p id="libraryMessage" class="library-message">Laden...</p>
+        <div id="libraryList" class="library-grid"></div>
+      </section>
+
+      <p id="status" aria-live="polite">Klaar.</p>
+      <audio id="soundPlayer" preload="auto"></audio>
     </main>
 
     <script src="./renderer.js"></script>

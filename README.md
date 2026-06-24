@@ -1,25 +1,36 @@
 # win-button
 
-Minimale Electron desktop-app voor Windows.
+Eenvoudige Electron desktop-app voor Windows met USB-knop trigger.
 
-## Wat deze MVP doet
+## Wat de app doet
 
 - Opent 1 venster.
-- Heeft een knop **"Test geluid"**.
-- Speelt lokaal MP3-bestand af: `sounds/click.mp3`.
-- Speelt hetzelfde geluid af als je op de **`**-toets drukt terwijl de app actief is.
+- Leest automatisch alle `.mp3`-bestanden uit `./sounds`.
+- Toont een geluidsbibliotheek met per bestand:
+  - bestandsnaam
+  - **Play/Test** knop
+  - **Instellen als vast geluid** knop
+- Speelt hetzelfde geluid af als je op de **`**-toets drukt, ook als het app-venster
+  niet actief is (via Electron `globalShortcut`).
+- Ondersteunt 2 modi:
+  - **Vast geluid** (gekozen bestand)
+  - **Random** (willekeurig bestand uit `./sounds`)
+- Slaat modus + vast geluid op in `settings.json` (via Electron main process + IPC).
 
 ## Projectstructuur
 
 ```text
 .
 ├── index.html
+├── ipc-channels.js
 ├── main.js
+├── preload.js
 ├── renderer.js
+├── settings.json (runtime, lokaal)
 ├── styles.css
 ├── package.json
 └── sounds/
-    └── click.mp3
+    └── *.mp3
 ```
 
 ## Exacte Windows terminalcommando's om te starten
