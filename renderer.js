@@ -1,6 +1,7 @@
 const playButton = document.getElementById("playButton");
 const statusText = document.getElementById("status");
 const sound = document.getElementById("sound");
+let removeMainListener = null;
 
 /**
  * Speelt het lokale MP3-bestand af vanaf het begin.
@@ -24,13 +25,18 @@ playButton.addEventListener("click", () => {
   playSound("Test geluid-knop");
 });
 
-window.addEventListener("keydown", (event) => {
-  // USB-knop stuurt de `-toets. We ondersteunen zowel key als code.
-  const isBackquoteKey = event.key === "`" || event.code === "Backquote";
-  if (!isBackquoteKey) {
-    return;
-  }
+if (window.electronAPI && typeof window.electronAPI.onPlaySoundRequested === "function") {
+  removeMainListener = window.electronAPI.onPlaySoundRequested((payload) => {
+    const source = payload && payload.source ? payload.source : "main process";
+    playSound(source);
+  });
+} else {
+  console.warn("electronAPI.onPlaySoundRequested is niet beschikbaar.");
+}
 
-  event.preventDefault();
-  playSound("`-toets");
+window.addEventListener("beforeunload", () => {
+  if (typeof removeMainListener === "function") {
+    removeMainListener();
+    removeMainListener = null;
+  }
 });

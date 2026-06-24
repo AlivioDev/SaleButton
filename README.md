@@ -7,14 +7,17 @@ Minimale Electron desktop-app voor Windows.
 - Opent 1 venster.
 - Heeft een knop **"Test geluid"**.
 - Speelt lokaal MP3-bestand af: `sounds/click.mp3`.
-- Speelt hetzelfde geluid af als je op de **`**-toets drukt terwijl de app actief is.
+- Speelt hetzelfde geluid af als je op de **`**-toets drukt, ook als het app-venster
+  niet actief is (via Electron `globalShortcut`).
 
 ## Projectstructuur
 
 ```text
 .
 ├── index.html
+├── ipc-channels.js
 ├── main.js
+├── preload.js
 ├── renderer.js
 ├── styles.css
 ├── package.json
