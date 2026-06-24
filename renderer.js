@@ -65,6 +65,16 @@ function setStatus(message, isError) {
   statusText.classList.toggle("error", Boolean(isError));
 }
 
+async function runApiCall(label, apiCall) {
+  try {
+    return await apiCall();
+  } catch (error) {
+    const message = error && error.message ? error.message : "Onbekende fout.";
+    setStatus(`${label} mislukt: ${message}`, true);
+    return null;
+  }
+}
+
 function modeLabel(mode) {
   return mode === "random" ? "Random" : "Vast geluid";
 }
@@ -122,7 +132,10 @@ function createSoundCard(filename) {
   playTestButton.type = "button";
   playTestButton.textContent = "Play/Test";
   playTestButton.addEventListener("click", async () => {
-    const result = await electronAPI.playSound(filename);
+    const result = await runApiCall("Play/Test", () => electronAPI.playSound(filename));
+    if (!result) {
+      return;
+    }
     if (!result.ok) {
       setStatus(result.error, true);
     }
@@ -134,7 +147,12 @@ function createSoundCard(filename) {
   setFixedButton.className = "secondary";
   setFixedButton.textContent = "Instellen als vast geluid";
   setFixedButton.addEventListener("click", async () => {
-    const result = await electronAPI.setFixedSound(filename);
+    const result = await runApiCall("Vast geluid instellen", () =>
+      electronAPI.setFixedSound(filename)
+    );
+    if (!result) {
+      return;
+    }
     if (!result.ok) {
       setStatus(result.error, true);
       return;
@@ -169,7 +187,11 @@ function renderUI() {
 }
 
 async function refreshAppState() {
-  appState = await electronAPI.refreshSoundLibrary();
+  const refreshedState = await runApiCall("Vernieuwen", () => electronAPI.refreshSoundLibrary());
+  if (!refreshedState) {
+    return;
+  }
+  appState = refreshedState;
   renderUI();
 }
 
@@ -182,7 +204,10 @@ function disableInteractiveUI() {
 
 function bindUIEvents() {
   playButton.addEventListener("click", async () => {
-    const result = await electronAPI.playCurrentMode();
+    const result = await runApiCall("Test huidige modus", () => electronAPI.playCurrentMode());
+    if (!result) {
+      return;
+    }
     if (!result.ok) {
       setStatus(result.error, true);
     }
@@ -198,7 +223,10 @@ function bindUIEvents() {
       return;
     }
 
-    const result = await electronAPI.setMode("fixed");
+    const result = await runApiCall("Modus instellen", () => electronAPI.setMode("fixed"));
+    if (!result) {
+      return;
+    }
     if (!result.ok) {
       setStatus(result.error, true);
       return;
@@ -214,7 +242,10 @@ function bindUIEvents() {
       return;
     }
 
-    const result = await electronAPI.setMode("random");
+    const result = await runApiCall("Modus instellen", () => electronAPI.setMode("random"));
+    if (!result) {
+      return;
+    }
     if (!result.ok) {
       setStatus(result.error, true);
       return;
@@ -238,6 +269,8 @@ function bindUIEvents() {
 }
 
 async function init() {
+  setStatus("Initialiseren...", false);
+
   if (!hasRequiredElectronAPI()) {
     disableInteractiveUI();
     setStatus(
@@ -249,7 +282,11 @@ async function init() {
   }
 
   bindUIEvents();
-  appState = await electronAPI.getAppState();
+  const initialState = await runApiCall("Initialisatie", () => electronAPI.getAppState());
+  if (!initialState) {
+    return;
+  }
+  appState = initialState;
   renderUI();
   setStatus("Klaar.", false);
 }

@@ -15,6 +15,17 @@ let mainWindow = null;
 let shortcutRegistered = false;
 let settings = { ...DEFAULT_SETTINGS };
 
+function safeIpcResult(handler) {
+  try {
+    return handler();
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.message ? error.message : "Onbekende IPC-fout."
+    };
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 700,
@@ -218,32 +229,30 @@ function playCurrentModeSound(source) {
 }
 
 function registerIpcHandlers() {
-  ipcMain.handle(IPC_CHANNELS.GET_APP_STATE, () => {
-    return buildAppState();
-  });
+  const handlerMap = {
+    [IPC_CHANNELS.GET_APP_STATE]: () => buildAppState(),
+    [IPC_CHANNELS.REFRESH_SOUND_LIBRARY]: () => buildAppState(),
+    [IPC_CHANNELS.PLAY_SOUND]: (filename) => {
+      const result = playSound(filename, "UI testknop");
+      if (!result.ok) {
+        sendPlaybackError(result.error, "UI testknop");
+      }
+      return result;
+    },
+    [IPC_CHANNELS.PLAY_CURRENT_MODE]: () => playCurrentModeSound("UI modus-test"),
+    [IPC_CHANNELS.SET_MODE]: (mode) => setMode(mode),
+    [IPC_CHANNELS.SET_FIXED_SOUND]: (filename) => setFixedSound(filename)
+  };
 
-  ipcMain.handle(IPC_CHANNELS.REFRESH_SOUND_LIBRARY, () => {
-    return buildAppState();
-  });
+  Object.entries(handlerMap).forEach(([channel, channelHandler]) => {
+    ipcMain.removeHandler(channel);
+    ipcMain.handle(channel, (_event, ...args) => safeIpcResult(() => channelHandler(...args)));
 
-  ipcMain.handle(IPC_CHANNELS.PLAY_SOUND, (_event, filename) => {
-    const result = playSound(filename, "UI testknop");
-    if (!result.ok) {
-      sendPlaybackError(result.error, "UI testknop");
-    }
-    return result;
-  });
-
-  ipcMain.handle(IPC_CHANNELS.PLAY_CURRENT_MODE, () => {
-    return playCurrentModeSound("UI modus-test");
-  });
-
-  ipcMain.handle(IPC_CHANNELS.SET_MODE, (_event, mode) => {
-    return setMode(mode);
-  });
-
-  ipcMain.handle(IPC_CHANNELS.SET_FIXED_SOUND, (_event, filename) => {
-    return setFixedSound(filename);
+    const syncChannel = `${channel}:sync`;
+    ipcMain.removeAllListeners(syncChannel);
+    ipcMain.on(syncChannel, (event, ...args) => {
+      event.returnValue = safeIpcResult(() => channelHandler(...args));
+    });
   });
 }
 
