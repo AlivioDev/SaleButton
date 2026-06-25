@@ -10,6 +10,7 @@ const statusText = document.getElementById("status");
 const soundPlayer = document.getElementById("soundPlayer");
 const modeFixedInput = document.getElementById("modeFixed");
 const modeRandomInput = document.getElementById("modeRandom");
+const appStatusText = document.getElementById("appStatus");
 const currentModeText = document.getElementById("currentMode");
 const currentFixedSoundText = document.getElementById("currentFixedSound");
 const soundCountText = document.getElementById("soundCount");
@@ -26,7 +27,8 @@ const DEFAULT_SETTINGS = {
 const state = {
   sounds: [],
   mode: "fixed",
-  fixedSound: null
+  fixedSound: null,
+  isPaused: false
 };
 
 function setStatus(message, isError) {
@@ -169,7 +171,21 @@ function modeLabel(mode) {
   return mode === "random" ? "Random" : "Vast geluid";
 }
 
+function renderAppStatus() {
+  if (state.isPaused) {
+    appStatusText.textContent = "Gepauzeerd";
+    appStatusText.classList.add("paused");
+    appStatusText.classList.remove("active");
+    return;
+  }
+
+  appStatusText.textContent = "Actief";
+  appStatusText.classList.add("active");
+  appStatusText.classList.remove("paused");
+}
+
 function renderSummary() {
+  renderAppStatus();
   currentModeText.textContent = modeLabel(state.mode);
   currentFixedSoundText.textContent = state.fixedSound || "(niet gekozen)";
   soundCountText.textContent = String(state.sounds.length);
@@ -225,7 +241,12 @@ function getCurrentModeSound() {
   return state.fixedSound;
 }
 
-function playCurrentModeSound(source) {
+function playCurrentModeSound(source, respectPause) {
+  if (respectPause && state.isPaused) {
+    setStatus("App staat op pauze. Hervat via het tray-menu om USB-trigger te gebruiken.", true);
+    return;
+  }
+
   const filename = getCurrentModeSound();
   if (!filename) {
     return;
@@ -307,7 +328,7 @@ function renderUI() {
 }
 
 playButton.addEventListener("click", () => {
-  playCurrentModeSound("Test huidige modus");
+  playCurrentModeSound("Test huidige modus", false);
 });
 
 refreshButton.addEventListener("click", () => {
@@ -337,13 +358,32 @@ modeRandomInput.addEventListener("change", () => {
 
 ipcRenderer.on("usb-trigger", () => {
   renderUI();
-  playCurrentModeSound("`-toets");
+  playCurrentModeSound("`-toets", true);
 });
 
-function init() {
+ipcRenderer.on("pause-state-changed", (_event, payload) => {
+  state.isPaused = Boolean(payload && payload.isPaused);
+  renderSummary();
+  setStatus(
+    state.isPaused
+      ? "App gepauzeerd via tray-menu."
+      : "App hervat via tray-menu.",
+    false
+  );
+});
+
+async function init() {
   const loaded = loadSettings();
   state.mode = loaded.mode;
   state.fixedSound = loaded.fixedSound;
+
+  try {
+    const paused = await ipcRenderer.invoke("get-pause-state");
+    state.isPaused = Boolean(paused);
+  } catch (error) {
+    setStatus(`Kon pauzestatus niet ophalen: ${error.message}`, true);
+  }
+
   renderUI();
   saveSettings();
   setStatus("Klaar.", false);
