@@ -20,17 +20,17 @@ Eenvoudige Electron desktop-app voor Windows met USB-knop trigger.
 - Ondersteunt 2 modi:
   - **Vast geluid** (gekozen bestand)
   - **Random** (willekeurig bestand uit `./sounds`)
-- Slaat modus + vast geluid op in `settings.json` (via Electron main process + IPC).
+- Slaat modus + vast geluid op in `settings.json`.
 
 ## Projectstructuur
 
 ```text
 .
 ├── index.html
-├── ipc-channels.js
 ├── main.js
-├── preload.js
 ├── renderer.js
+├── assets/
+│   └── icon.ico
 ├── settings.json (runtime, lokaal)
 ├── styles.css
 ├── package.json
@@ -49,3 +49,11 @@ npm start
 
 Als `npm` nog niet bestaat op je systeem, installeer eerst Node.js LTS via:
 https://nodejs.org/
+
+## Windows installer bouwen (electron-builder)
+
+```powershell
+npm run dist
+```
+
+Output staat in de map `dist/` (NSIS installer `.exe`).

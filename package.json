@@ -1,15 +1,58 @@
 {
-  "name": "usb-button-sound-app",
+  "name": "sale-button",
   "version": "1.0.0",
-  "description": "Simple Electron app that plays a local MP3 on button click or backquote key press.",
+  "description": "Callcenter sale soundboard",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder --win --x64 --dir",
+    "dist": "electron-builder --win nsis --x64"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^37.0.0"
+    "electron": "^37.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.salebutton.app",
+    "productName": "Sale Button",
+    "copyright": "Copyright (c) Sale Button",
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "renderer.js",
+      "styles.css",
+      "sounds/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "executableName": "SaleButton"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sale Button",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
