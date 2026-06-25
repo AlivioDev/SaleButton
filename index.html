@@ -9,7 +9,6 @@
   <body>
     <main class="container">
       <h1>USB knop geluid test</h1>
-
       <section class="panel">
         <h2>Afspeelmodus</h2>
         <div class="mode-row">
@@ -29,9 +28,18 @@
       <section class="panel summary">
         <h2>Huidige status</h2>
         <p><strong>App status:</strong> <span id="appStatus" class="app-state">Actief</span></p>
+        <p><strong>Opstarten met Windows:</strong> <span id="startupState">Nee</span></p>
         <p><strong>Modus:</strong> <span id="currentMode">-</span></p>
         <p><strong>Vast geluid:</strong> <span id="currentFixedSound">-</span></p>
         <p><strong>Aantal MP3-bestanden:</strong> <span id="soundCount">0</span></p>
+      </section>
+
+      <section class="panel" id="settingsPanel">
+        <h2>Instellingen</h2>
+        <label class="settings-toggle">
+          <input id="startupToggle" type="checkbox" />
+          Start Sale Button automatisch met Windows
+        </label>
       </section>
 
       <section class="panel">

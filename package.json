@@ -52,7 +52,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Sale Button",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "assets/Sale Button.ico",
+      "uninstallerIcon": "assets/Sale Button.ico",
+      "include": "build/installer.nsh"
     }
   }
 }

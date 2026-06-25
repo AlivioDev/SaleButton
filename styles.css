@@ -72,6 +72,13 @@ button.secondary:hover {
   cursor: pointer;
 }
 
+.settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
 .library-header {
   display: flex;
   align-items: center;
