@@ -67,7 +67,11 @@ function setStatus(message, isError) {
 
 async function runApiCall(label, apiCall) {
   try {
-    return await apiCall();
+    const result = await apiCall();
+    if (result === undefined || result === null) {
+      throw new Error("Lege respons van main process.");
+    }
+    return result;
   } catch (error) {
     const message = error && error.message ? error.message : "Onbekende fout.";
     setStatus(`${label} mislukt: ${message}`, true);
