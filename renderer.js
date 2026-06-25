@@ -3,6 +3,8 @@ const path = require("path");
 const { ipcRenderer } = require("electron");
 
 const playButton = document.getElementById("playButton");
+const addMp3Button = document.getElementById("addMp3Button");
+const mp3FileInput = document.getElementById("mp3FileInput");
 const refreshButton = document.getElementById("refreshButton");
 const statusText = document.getElementById("status");
 const soundPlayer = document.getElementById("soundPlayer");
@@ -90,6 +92,76 @@ function loadSoundLibrary() {
   } catch (error) {
     state.sounds = [];
     libraryMessage.textContent = `Fout bij lezen van ./sounds: ${error.message}`;
+  }
+}
+
+function ensureSoundsDir() {
+  if (!fs.existsSync(SOUNDS_DIR)) {
+    fs.mkdirSync(SOUNDS_DIR, { recursive: true });
+  }
+}
+
+function getUniqueTargetPath(fileName) {
+  const parsed = path.parse(fileName);
+  let index = 0;
+  let candidate = path.join(SOUNDS_DIR, fileName);
+
+  while (fs.existsSync(candidate)) {
+    index += 1;
+    const nextName = `${parsed.name} (${index})${parsed.ext}`;
+    candidate = path.join(SOUNDS_DIR, nextName);
+  }
+
+  return candidate;
+}
+
+async function addSelectedMp3Files() {
+  const selectedFiles = Array.from(mp3FileInput.files || []);
+
+  if (selectedFiles.length === 0) {
+    return;
+  }
+
+  try {
+    ensureSoundsDir();
+
+    let copiedCount = 0;
+
+    for (const file of selectedFiles) {
+      const sourcePath = file.path;
+      const fileName = sourcePath ? path.basename(sourcePath) : file.name;
+      const extension = path.extname(fileName).toLowerCase();
+      if (extension !== ".mp3") {
+        continue;
+      }
+
+      const targetPath = getUniqueTargetPath(fileName);
+
+      if (sourcePath) {
+        fs.copyFileSync(sourcePath, targetPath);
+      } else if (typeof file.arrayBuffer === "function") {
+        const arrayBuffer = await file.arrayBuffer();
+        fs.writeFileSync(targetPath, Buffer.from(arrayBuffer));
+      } else {
+        continue;
+      }
+
+      copiedCount += 1;
+    }
+
+    renderUI();
+
+    if (copiedCount === 0) {
+      setStatus("Geen geldige MP3-bestanden geselecteerd.", true);
+      return;
+    }
+
+    setStatus(`${copiedCount} MP3-bestand(en) toegevoegd aan ./sounds.`, false);
+  } catch (error) {
+    setStatus(`MP3 toevoegen mislukt: ${error.message}`, true);
+  } finally {
+    // Leegmaken zodat hetzelfde bestand later opnieuw gekozen kan worden.
+    mp3FileInput.value = "";
   }
 }
 
@@ -241,6 +313,14 @@ playButton.addEventListener("click", () => {
 refreshButton.addEventListener("click", () => {
   renderUI();
   setStatus("Geluidsbibliotheek vernieuwd.", false);
+});
+
+addMp3Button.addEventListener("click", () => {
+  mp3FileInput.click();
+});
+
+mp3FileInput.addEventListener("change", () => {
+  addSelectedMp3Files();
 });
 
 modeFixedInput.addEventListener("change", () => {

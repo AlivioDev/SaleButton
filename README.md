@@ -13,6 +13,8 @@ Eenvoudige Electron desktop-app voor Windows met USB-knop trigger.
   - bestandsnaam
   - **Play/Test** knop
   - **Instellen als vast geluid** knop
+- Heeft een knop **MP3 toevoegen** waarmee de gebruiker via de Windows bestandskiezer
+  MP3-bestanden direct naar `./sounds` kopieert.
 - Speelt hetzelfde geluid af als je op de **`**-toets drukt, ook als het app-venster
   niet actief is (via Electron `globalShortcut`).
 - Ondersteunt 2 modi:

@@ -79,6 +79,12 @@ button.secondary:hover {
   gap: 12px;
 }
 
+.library-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .library-message {
   margin: 12px 0 8px;
   color: #4b5563;
