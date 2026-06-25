@@ -1,5 +1,5 @@
 const path = require("path");
-const { app, BrowserWindow, globalShortcut, Menu, Tray, ipcMain } = require("electron");
+const { app, BrowserWindow, globalShortcut, Menu, Tray, ipcMain, nativeImage } = require("electron");
 
 const BACKQUOTE_ACCELERATOR = "`";
 const CHANNELS = {
@@ -94,8 +94,20 @@ function buildTrayMenu() {
 }
 
 function createTray() {
-  const trayIconPath = path.join(__dirname, "assets", "icon.ico");
-  tray = new Tray(trayIconPath);
+  const icoPath = path.join(__dirname, "assets", "icon.ico");
+  const pngPath = path.join(__dirname, "assets", "icon.png");
+  const preferredPath = process.platform === "win32" ? icoPath : pngPath;
+  const fallbackPath = process.platform === "win32" ? pngPath : icoPath;
+
+  let trayIcon = nativeImage.createFromPath(preferredPath);
+  if (trayIcon.isEmpty()) {
+    trayIcon = nativeImage.createFromPath(fallbackPath);
+  }
+  if (trayIcon.isEmpty()) {
+    throw new Error("Kon geen geldig tray-icoon laden.");
+  }
+
+  tray = new Tray(trayIcon);
   tray.setToolTip("Sale Button");
   tray.setContextMenu(buildTrayMenu());
 
@@ -126,11 +138,15 @@ function registerGlobalBackquoteShortcut() {
 }
 
 app.whenReady().then(() => {
-  createWindow();
-  createTray();
-  registerGlobalBackquoteShortcut();
-
   ipcMain.handle(CHANNELS.GET_PAUSE_STATE, () => isPaused);
+
+  createWindow();
+  try {
+    createTray();
+  } catch (error) {
+    console.error(`Tray kon niet gestart worden: ${error.message}`);
+  }
+  registerGlobalBackquoteShortcut();
 
   app.on("activate", () => {
     openMainWindow();
