@@ -21,6 +21,8 @@ Eenvoudige Electron desktop-app voor Windows met USB-knop trigger.
   - **Vast geluid** (gekozen bestand)
   - **Random** (willekeurig bestand uit `./sounds`)
 - Slaat modus + vast geluid op in `settings.json`.
+- Draait in systeemvak (tray): sluiten met **X** verbergt de app i.p.v. volledig afsluiten.
+- Via **File > Instellingen** kun je **Start met Windows** aan/uit zetten.
 
 ## Projectstructuur
 

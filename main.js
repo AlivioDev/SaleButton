@@ -5,7 +5,10 @@ const BACKQUOTE_ACCELERATOR = "`";
 const CHANNELS = {
   USB_TRIGGER: "usb-trigger",
   PAUSE_CHANGED: "pause-state-changed",
-  GET_PAUSE_STATE: "get-pause-state"
+  GET_PAUSE_STATE: "get-pause-state",
+  GET_STARTUP_SETTING: "get-startup-setting",
+  SET_STARTUP_SETTING: "set-startup-setting",
+  OPEN_SETTINGS: "open-settings"
 };
 
 let mainWindow = null;
@@ -13,6 +16,11 @@ let tray = null;
 let shortcutRegistered = false;
 let isPaused = false;
 let isQuitting = false;
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -41,6 +49,14 @@ function createWindow() {
   });
 }
 
+function sendOpenSettingsToRenderer() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send(CHANNELS.OPEN_SETTINGS);
+}
+
 function openMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) {
     createWindow();
@@ -60,6 +76,52 @@ function sendPauseStateToRenderer() {
   }
 
   mainWindow.webContents.send(CHANNELS.PAUSE_CHANGED, { isPaused });
+}
+
+function getStartupSetting() {
+  const loginSettings = app.getLoginItemSettings();
+  return Boolean(loginSettings.openAtLogin);
+}
+
+function setStartupSetting(enabled) {
+  const options = {
+    openAtLogin: Boolean(enabled)
+  };
+
+  if (process.platform === "win32") {
+    options.path = process.execPath;
+    options.args = [];
+  }
+
+  app.setLoginItemSettings(options);
+  return getStartupSetting();
+}
+
+function createAppMenu() {
+  const template = [
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "Instellingen",
+          click: () => {
+            openMainWindow();
+            sendOpenSettingsToRenderer();
+          }
+        },
+        { type: "separator" },
+        {
+          label: "Sluiten",
+          click: () => {
+            isQuitting = true;
+            app.quit();
+          }
+        }
+      ]
+    }
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 function buildTrayMenu() {
@@ -137,31 +199,40 @@ function registerGlobalBackquoteShortcut() {
   }
 }
 
-app.whenReady().then(() => {
-  ipcMain.handle(CHANNELS.GET_PAUSE_STATE, () => isPaused);
+if (hasSingleInstanceLock) {
+  app.whenReady().then(() => {
+    ipcMain.handle(CHANNELS.GET_PAUSE_STATE, () => isPaused);
+    ipcMain.handle(CHANNELS.GET_STARTUP_SETTING, () => getStartupSetting());
+    ipcMain.handle(CHANNELS.SET_STARTUP_SETTING, (_event, enabled) => setStartupSetting(enabled));
 
-  createWindow();
-  try {
-    createTray();
-  } catch (error) {
-    console.error(`Tray kon niet gestart worden: ${error.message}`);
-  }
-  registerGlobalBackquoteShortcut();
+    createAppMenu();
+    createWindow();
+    try {
+      createTray();
+    } catch (error) {
+      console.error(`Tray kon niet gestart worden: ${error.message}`);
+    }
+    registerGlobalBackquoteShortcut();
 
-  app.on("activate", () => {
+    app.on("activate", () => {
+      openMainWindow();
+    });
+  });
+
+  app.on("second-instance", () => {
     openMainWindow();
   });
-});
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin" && isQuitting) {
+      app.quit();
+    }
+  });
 
-app.on("will-quit", () => {
-  if (shortcutRegistered) {
-    globalShortcut.unregister(BACKQUOTE_ACCELERATOR);
-    shortcutRegistered = false;
-  }
-});
+  app.on("will-quit", () => {
+    if (shortcutRegistered) {
+      globalShortcut.unregister(BACKQUOTE_ACCELERATOR);
+      shortcutRegistered = false;
+    }
+  });
+}

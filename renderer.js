@@ -11,6 +11,9 @@ const soundPlayer = document.getElementById("soundPlayer");
 const modeFixedInput = document.getElementById("modeFixed");
 const modeRandomInput = document.getElementById("modeRandom");
 const appStatusText = document.getElementById("appStatus");
+const startupToggleInput = document.getElementById("startupToggle");
+const startupStateText = document.getElementById("startupState");
+const settingsPanel = document.getElementById("settingsPanel");
 const currentModeText = document.getElementById("currentMode");
 const currentFixedSoundText = document.getElementById("currentFixedSound");
 const soundCountText = document.getElementById("soundCount");
@@ -28,12 +31,17 @@ const state = {
   sounds: [],
   mode: "fixed",
   fixedSound: null,
-  isPaused: false
+  isPaused: false,
+  startupEnabled: false
 };
 
 function setStatus(message, isError) {
   statusText.textContent = message;
   statusText.classList.toggle("error", Boolean(isError));
+}
+
+function showError(message) {
+  setStatus(message, true);
 }
 
 function loadSettings() {
@@ -50,7 +58,7 @@ function loadSettings() {
       fixedSound: typeof parsed.fixedSound === "string" && parsed.fixedSound ? parsed.fixedSound : null
     };
   } catch (error) {
-    setStatus(`Kon settings niet laden: ${error.message}`, true);
+    showError(`Kon settings niet laden: ${error.message}`);
     return { ...DEFAULT_SETTINGS };
   }
 }
@@ -63,7 +71,7 @@ function saveSettings() {
     };
     fs.writeFileSync(SETTINGS_PATH, JSON.stringify(payload, null, 2), "utf8");
   } catch (error) {
-    setStatus(`Kon settings niet opslaan: ${error.message}`, true);
+    showError(`Kon settings niet opslaan: ${error.message}`);
   }
 }
 
@@ -154,13 +162,11 @@ async function addSelectedMp3Files() {
     renderUI();
 
     if (copiedCount === 0) {
-      setStatus("Geen geldige MP3-bestanden geselecteerd.", true);
+      showError("Geen geldige MP3-bestanden geselecteerd.");
       return;
     }
-
-    setStatus(`${copiedCount} MP3-bestand(en) toegevoegd aan ./sounds.`, false);
   } catch (error) {
-    setStatus(`MP3 toevoegen mislukt: ${error.message}`, true);
+    showError(`MP3 toevoegen mislukt: ${error.message}`);
   } finally {
     // Leegmaken zodat hetzelfde bestand later opnieuw gekozen kan worden.
     mp3FileInput.value = "";
@@ -186,6 +192,8 @@ function renderAppStatus() {
 
 function renderSummary() {
   renderAppStatus();
+  startupToggleInput.checked = state.startupEnabled;
+  startupStateText.textContent = state.startupEnabled ? "Ja" : "Nee";
   currentModeText.textContent = modeLabel(state.mode);
   currentFixedSoundText.textContent = state.fixedSound || "(niet gekozen)";
   soundCountText.textContent = String(state.sounds.length);
@@ -195,7 +203,7 @@ function renderSummary() {
 
 function playSound(filename, source) {
   if (!filename) {
-    setStatus("Geen geluidsbestand gekozen.", true);
+    showError("Geen geluidsbestand gekozen.");
     return;
   }
 
@@ -204,22 +212,19 @@ function playSound(filename, source) {
 
   soundPlayer
     .play()
-    .then(() => {
-      setStatus(`Geluid afgespeeld: ${filename} (via ${source})`, false);
-    })
     .catch((error) => {
-      setStatus(`Afspelen mislukt: ${error.message}`, true);
+      showError(`Afspelen mislukt: ${error.message}`);
     });
 }
 
 function getCurrentModeSound() {
   if (!fs.existsSync(SOUNDS_DIR)) {
-    setStatus("Map ./sounds bestaat niet.", true);
+    showError("Map ./sounds bestaat niet.");
     return null;
   }
 
   if (state.sounds.length === 0) {
-    setStatus("Geen MP3-bestanden gevonden in ./sounds.", true);
+    showError("Geen MP3-bestanden gevonden in ./sounds.");
     return null;
   }
 
@@ -229,12 +234,12 @@ function getCurrentModeSound() {
   }
 
   if (!state.fixedSound) {
-    setStatus("Er is nog geen vast geluid gekozen.", true);
+    showError("Er is nog geen vast geluid gekozen.");
     return null;
   }
 
   if (!state.sounds.includes(state.fixedSound)) {
-    setStatus(`Gekozen vast geluid bestaat niet meer: ${state.fixedSound}`, true);
+    showError(`Gekozen vast geluid bestaat niet meer: ${state.fixedSound}`);
     return null;
   }
 
@@ -243,7 +248,7 @@ function getCurrentModeSound() {
 
 function playCurrentModeSound(source, respectPause) {
   if (respectPause && state.isPaused) {
-    setStatus("App staat op pauze. Hervat via het tray-menu om USB-trigger te gebruiken.", true);
+    showError("App staat op pauze. Hervat via tray-menu om USB-knop te gebruiken.");
     return;
   }
 
@@ -258,19 +263,17 @@ function setMode(mode) {
   state.mode = mode === "random" ? "random" : "fixed";
   saveSettings();
   renderSummary();
-  setStatus(`Modus ingesteld op: ${modeLabel(state.mode)}.`, false);
 }
 
 function setFixedSound(filename) {
   if (!state.sounds.includes(filename)) {
-    setStatus(`Geluid niet gevonden: ${filename}`, true);
+    showError(`Geluid niet gevonden: ${filename}`);
     return;
   }
 
   state.fixedSound = filename;
   saveSettings();
   renderUI();
-  setStatus(`Vast geluid ingesteld op: ${filename}`, false);
 }
 
 function createSoundCard(filename) {
@@ -333,7 +336,6 @@ playButton.addEventListener("click", () => {
 
 refreshButton.addEventListener("click", () => {
   renderUI();
-  setStatus("Geluidsbibliotheek vernieuwd.", false);
 });
 
 addMp3Button.addEventListener("click", () => {
@@ -366,6 +368,22 @@ ipcRenderer.on("pause-state-changed", (_event, payload) => {
   renderSummary();
 });
 
+ipcRenderer.on("open-settings", () => {
+  settingsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  startupToggleInput.focus();
+});
+
+startupToggleInput.addEventListener("change", async () => {
+  try {
+    const updatedValue = await ipcRenderer.invoke("set-startup-setting", startupToggleInput.checked);
+    state.startupEnabled = Boolean(updatedValue);
+    renderSummary();
+  } catch (error) {
+    showError(`Kon opstartinstelling niet aanpassen: ${error.message}`);
+    renderSummary();
+  }
+});
+
 async function init() {
   const loaded = loadSettings();
   state.mode = loaded.mode;
@@ -375,12 +393,19 @@ async function init() {
     const paused = await ipcRenderer.invoke("get-pause-state");
     state.isPaused = Boolean(paused);
   } catch (error) {
-    setStatus(`Kon pauzestatus niet ophalen: ${error.message}`, true);
+    showError(`Kon pauzestatus niet ophalen: ${error.message}`);
+  }
+
+  try {
+    const startupEnabled = await ipcRenderer.invoke("get-startup-setting");
+    state.startupEnabled = Boolean(startupEnabled);
+  } catch (error) {
+    showError(`Kon opstartinstelling niet ophalen: ${error.message}`);
   }
 
   renderUI();
   saveSettings();
-  setStatus("Klaar.", false);
+  setStatus("", false);
 }
 
 init();
