@@ -94,8 +94,8 @@ function buildTrayMenu() {
 }
 
 function createTray() {
-  const icoPath = path.join(__dirname, "assets", "icon.ico");
-  const pngPath = path.join(__dirname, "assets", "icon.png");
+  const icoPath = path.join(__dirname, "assets", "Sale Button.ico");
+  const pngPath = path.join(__dirname, "assets", "Sale Button.png");
   const preferredPath = process.platform === "win32" ? icoPath : pngPath;
   const fallbackPath = process.platform === "win32" ? pngPath : icoPath;
 
