@@ -42,7 +42,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico",
+      "icon": "assets/Sale Button.ico",
       "executableName": "SaleButton"
     },
     "nsis": {

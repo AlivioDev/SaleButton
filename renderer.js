@@ -364,12 +364,6 @@ ipcRenderer.on("usb-trigger", () => {
 ipcRenderer.on("pause-state-changed", (_event, payload) => {
   state.isPaused = Boolean(payload && payload.isPaused);
   renderSummary();
-  setStatus(
-    state.isPaused
-      ? "App gepauzeerd via tray-menu."
-      : "App hervat via tray-menu.",
-    false
-  );
 });
 
 async function init() {

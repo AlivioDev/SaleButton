@@ -30,7 +30,7 @@ Eenvoudige Electron desktop-app voor Windows met USB-knop trigger.
 ├── main.js
 ├── renderer.js
 ├── assets/
-│   └── icon.ico
+│   └── Sale Button.ico
 ├── settings.json (runtime, lokaal)
 ├── styles.css
 ├── package.json
