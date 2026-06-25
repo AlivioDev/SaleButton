@@ -1,3 +1,7 @@
+const fs = require("fs");
+const path = require("path");
+const { ipcRenderer } = require("electron");
+
 const playButton = document.getElementById("playButton");
 const refreshButton = document.getElementById("refreshButton");
 const statusText = document.getElementById("status");
@@ -9,73 +13,83 @@ const currentFixedSoundText = document.getElementById("currentFixedSound");
 const soundCountText = document.getElementById("soundCount");
 const libraryMessage = document.getElementById("libraryMessage");
 const libraryList = document.getElementById("libraryList");
-const electronAPI = window.electronAPI;
 
-let removeMainListener = null;
-let appState = {
-  sounds: [],
-  settings: {
-    mode: "fixed",
-    fixedSound: null
-  },
-  errors: {
-    soundsFolderMissing: false,
-    noMp3Found: false,
-    fixedSoundMissing: false,
-    message: null
-  },
-  meta: {
-    soundCount: 0
-  }
+const SOUNDS_DIR = path.join(__dirname, "sounds");
+const SETTINGS_PATH = path.join(__dirname, "settings.json");
+const DEFAULT_SETTINGS = {
+  mode: "fixed",
+  fixedSound: null
 };
 
-function hasRequiredElectronAPI() {
-  return Boolean(
-    electronAPI &&
-      typeof electronAPI.getAppState === "function" &&
-      typeof electronAPI.refreshSoundLibrary === "function" &&
-      typeof electronAPI.playSound === "function" &&
-      typeof electronAPI.playCurrentMode === "function" &&
-      typeof electronAPI.setMode === "function" &&
-      typeof electronAPI.setFixedSound === "function" &&
-      typeof electronAPI.onPlaySoundRequested === "function"
-  );
-}
-
-/**
- * Speelt een lokaal MP3-bestand af uit ./sounds.
- */
-function playSound(filename, triggerSource) {
-  soundPlayer.src = `./sounds/${encodeURIComponent(filename)}`;
-  soundPlayer.currentTime = 0;
-
-  soundPlayer
-    .play()
-    .then(() => {
-      setStatus(`Geluid afgespeeld: ${filename} (via ${triggerSource})`, false);
-    })
-    .catch((error) => {
-      setStatus(`Afspelen mislukt: ${error.message}`, true);
-      console.error("Kon geluid niet afspelen:", error);
-    });
-}
+const state = {
+  sounds: [],
+  mode: "fixed",
+  fixedSound: null
+};
 
 function setStatus(message, isError) {
   statusText.textContent = message;
   statusText.classList.toggle("error", Boolean(isError));
 }
 
-async function runApiCall(label, apiCall) {
+function loadSettings() {
   try {
-    const result = await apiCall();
-    if (result === undefined || result === null) {
-      throw new Error("Lege respons van main process.");
+    if (!fs.existsSync(SETTINGS_PATH)) {
+      return { ...DEFAULT_SETTINGS };
     }
-    return result;
+
+    const raw = fs.readFileSync(SETTINGS_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+
+    return {
+      mode: parsed.mode === "random" ? "random" : "fixed",
+      fixedSound: typeof parsed.fixedSound === "string" && parsed.fixedSound ? parsed.fixedSound : null
+    };
   } catch (error) {
-    const message = error && error.message ? error.message : "Onbekende fout.";
-    setStatus(`${label} mislukt: ${message}`, true);
-    return null;
+    setStatus(`Kon settings niet laden: ${error.message}`, true);
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings() {
+  try {
+    const payload = {
+      mode: state.mode,
+      fixedSound: state.fixedSound
+    };
+    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(payload, null, 2), "utf8");
+  } catch (error) {
+    setStatus(`Kon settings niet opslaan: ${error.message}`, true);
+  }
+}
+
+function loadSoundLibrary() {
+  if (!fs.existsSync(SOUNDS_DIR)) {
+    state.sounds = [];
+    libraryMessage.textContent = "Fout: map ./sounds bestaat niet.";
+    return;
+  }
+
+  try {
+    const items = fs.readdirSync(SOUNDS_DIR);
+    state.sounds = items
+      .filter((name) => path.extname(name).toLowerCase() === ".mp3")
+      .sort((a, b) => a.localeCompare(b));
+
+    if (state.sounds.length === 0) {
+      libraryMessage.textContent = "Fout: geen MP3-bestanden gevonden in ./sounds.";
+      return;
+    }
+
+    if (state.fixedSound && !state.sounds.includes(state.fixedSound)) {
+      libraryMessage.textContent = `Fout: gekozen vast geluid bestaat niet meer (${state.fixedSound}).`;
+      return;
+    }
+
+    libraryMessage.textContent = `${state.sounds.length} MP3-bestand(en) gevonden.`;
+  } catch (error) {
+    state.sounds = [];
+    libraryMessage.textContent = `Fout bij lezen van ./sounds: ${error.message}`;
   }
 }
 
@@ -84,40 +98,93 @@ function modeLabel(mode) {
 }
 
 function renderSummary() {
-  currentModeText.textContent = modeLabel(appState.settings.mode);
-  currentFixedSoundText.textContent = appState.settings.fixedSound || "(niet gekozen)";
-  soundCountText.textContent = String(appState.meta.soundCount || 0);
-
-  modeFixedInput.checked = appState.settings.mode === "fixed";
-  modeRandomInput.checked = appState.settings.mode === "random";
+  currentModeText.textContent = modeLabel(state.mode);
+  currentFixedSoundText.textContent = state.fixedSound || "(niet gekozen)";
+  soundCountText.textContent = String(state.sounds.length);
+  modeFixedInput.checked = state.mode === "fixed";
+  modeRandomInput.checked = state.mode === "random";
 }
 
-function renderLibraryMessage() {
-  if (appState.errors.soundsFolderMissing) {
-    libraryMessage.textContent = "Fout: map ./sounds bestaat niet.";
+function playSound(filename, source) {
+  if (!filename) {
+    setStatus("Geen geluidsbestand gekozen.", true);
     return;
   }
 
-  if (appState.errors.noMp3Found) {
-    libraryMessage.textContent = "Fout: geen MP3-bestanden gevonden in ./sounds.";
+  soundPlayer.src = `./sounds/${encodeURIComponent(filename)}`;
+  soundPlayer.currentTime = 0;
+
+  soundPlayer
+    .play()
+    .then(() => {
+      setStatus(`Geluid afgespeeld: ${filename} (via ${source})`, false);
+    })
+    .catch((error) => {
+      setStatus(`Afspelen mislukt: ${error.message}`, true);
+    });
+}
+
+function getCurrentModeSound() {
+  if (!fs.existsSync(SOUNDS_DIR)) {
+    setStatus("Map ./sounds bestaat niet.", true);
+    return null;
+  }
+
+  if (state.sounds.length === 0) {
+    setStatus("Geen MP3-bestanden gevonden in ./sounds.", true);
+    return null;
+  }
+
+  if (state.mode === "random") {
+    const index = Math.floor(Math.random() * state.sounds.length);
+    return state.sounds[index];
+  }
+
+  if (!state.fixedSound) {
+    setStatus("Er is nog geen vast geluid gekozen.", true);
+    return null;
+  }
+
+  if (!state.sounds.includes(state.fixedSound)) {
+    setStatus(`Gekozen vast geluid bestaat niet meer: ${state.fixedSound}`, true);
+    return null;
+  }
+
+  return state.fixedSound;
+}
+
+function playCurrentModeSound(source) {
+  const filename = getCurrentModeSound();
+  if (!filename) {
+    return;
+  }
+  playSound(filename, source);
+}
+
+function setMode(mode) {
+  state.mode = mode === "random" ? "random" : "fixed";
+  saveSettings();
+  renderSummary();
+  setStatus(`Modus ingesteld op: ${modeLabel(state.mode)}.`, false);
+}
+
+function setFixedSound(filename) {
+  if (!state.sounds.includes(filename)) {
+    setStatus(`Geluid niet gevonden: ${filename}`, true);
     return;
   }
 
-  if (appState.errors.fixedSoundMissing) {
-    libraryMessage.textContent = `Waarschuwing: vast geluid ontbreekt (${appState.settings.fixedSound}).`;
-    return;
-  }
-
-  libraryMessage.textContent = `${appState.sounds.length} MP3-bestand(en) gevonden.`;
+  state.fixedSound = filename;
+  saveSettings();
+  renderUI();
+  setStatus(`Vast geluid ingesteld op: ${filename}`, false);
 }
 
 function createSoundCard(filename) {
   const card = document.createElement("article");
-  const isFixedSound = appState.settings.fixedSound === filename;
+  card.className = `sound-card${state.fixedSound === filename ? " is-fixed" : ""}`;
 
-  card.className = `sound-card${isFixedSound ? " is-fixed" : ""}`;
-
-  if (isFixedSound) {
+  if (state.fixedSound === filename) {
     const badge = document.createElement("span");
     badge.className = "badge";
     badge.textContent = "Vast geluid";
@@ -135,14 +202,8 @@ function createSoundCard(filename) {
   const playTestButton = document.createElement("button");
   playTestButton.type = "button";
   playTestButton.textContent = "Play/Test";
-  playTestButton.addEventListener("click", async () => {
-    const result = await runApiCall("Play/Test", () => electronAPI.playSound(filename));
-    if (!result) {
-      return;
-    }
-    if (!result.ok) {
-      setStatus(result.error, true);
-    }
+  playTestButton.addEventListener("click", () => {
+    playSound(filename, "Play/Test knop");
   });
   actions.appendChild(playTestButton);
 
@@ -150,21 +211,8 @@ function createSoundCard(filename) {
   setFixedButton.type = "button";
   setFixedButton.className = "secondary";
   setFixedButton.textContent = "Instellen als vast geluid";
-  setFixedButton.addEventListener("click", async () => {
-    const result = await runApiCall("Vast geluid instellen", () =>
-      electronAPI.setFixedSound(filename)
-    );
-    if (!result) {
-      return;
-    }
-    if (!result.ok) {
-      setStatus(result.error, true);
-      return;
-    }
-
-    appState = result.state;
-    renderUI();
-    setStatus(`Vast geluid ingesteld op: ${filename}`, false);
+  setFixedButton.addEventListener("click", () => {
+    setFixedSound(filename);
   });
   actions.appendChild(setFixedButton);
 
@@ -174,134 +222,51 @@ function createSoundCard(filename) {
 
 function renderLibrary() {
   libraryList.innerHTML = "";
-
-  if (!appState.sounds.length) {
-    return;
-  }
-
-  appState.sounds.forEach((filename) => {
+  state.sounds.forEach((filename) => {
     libraryList.appendChild(createSoundCard(filename));
   });
 }
 
 function renderUI() {
   renderSummary();
-  renderLibraryMessage();
+  loadSoundLibrary();
+  renderSummary();
   renderLibrary();
 }
 
-async function refreshAppState() {
-  const refreshedState = await runApiCall("Vernieuwen", () => electronAPI.refreshSoundLibrary());
-  if (!refreshedState) {
-    return;
-  }
-  appState = refreshedState;
+playButton.addEventListener("click", () => {
+  playCurrentModeSound("Test huidige modus");
+});
+
+refreshButton.addEventListener("click", () => {
   renderUI();
-}
+  setStatus("Geluidsbibliotheek vernieuwd.", false);
+});
 
-function disableInteractiveUI() {
-  playButton.disabled = true;
-  refreshButton.disabled = true;
-  modeFixedInput.disabled = true;
-  modeRandomInput.disabled = true;
-}
-
-function bindUIEvents() {
-  playButton.addEventListener("click", async () => {
-    const result = await runApiCall("Test huidige modus", () => electronAPI.playCurrentMode());
-    if (!result) {
-      return;
-    }
-    if (!result.ok) {
-      setStatus(result.error, true);
-    }
-  });
-
-  refreshButton.addEventListener("click", async () => {
-    await refreshAppState();
-    setStatus("Geluidsbibliotheek vernieuwd.", false);
-  });
-
-  modeFixedInput.addEventListener("change", async () => {
-    if (!modeFixedInput.checked) {
-      return;
-    }
-
-    const result = await runApiCall("Modus instellen", () => electronAPI.setMode("fixed"));
-    if (!result) {
-      return;
-    }
-    if (!result.ok) {
-      setStatus(result.error, true);
-      return;
-    }
-
-    appState = result.state;
-    renderUI();
-    setStatus("Modus ingesteld op: Vast geluid.", false);
-  });
-
-  modeRandomInput.addEventListener("change", async () => {
-    if (!modeRandomInput.checked) {
-      return;
-    }
-
-    const result = await runApiCall("Modus instellen", () => electronAPI.setMode("random"));
-    if (!result) {
-      return;
-    }
-    if (!result.ok) {
-      setStatus(result.error, true);
-      return;
-    }
-
-    appState = result.state;
-    renderUI();
-    setStatus("Modus ingesteld op: Random.", false);
-  });
-
-  removeMainListener = electronAPI.onPlaySoundRequested((payload) => {
-    if (!payload || !payload.ok) {
-      const errorMessage = payload && payload.error ? payload.error : "Onbekende afspeelfout.";
-      setStatus(errorMessage, true);
-      return;
-    }
-
-    const source = payload.source || "main process";
-    playSound(payload.filename, source);
-  });
-}
-
-async function init() {
-  setStatus("Initialiseren...", false);
-
-  if (!hasRequiredElectronAPI()) {
-    disableInteractiveUI();
-    setStatus(
-      "Initialisatie mislukt: preload/IPC API niet beschikbaar. Herstart de app volledig.",
-      true
-    );
-    console.error("electronAPI ontbreekt of is onvolledig:", electronAPI);
-    return;
+modeFixedInput.addEventListener("change", () => {
+  if (modeFixedInput.checked) {
+    setMode("fixed");
   }
+});
 
-  bindUIEvents();
-  const initialState = await runApiCall("Initialisatie", () => electronAPI.getAppState());
-  if (!initialState) {
-    return;
+modeRandomInput.addEventListener("change", () => {
+  if (modeRandomInput.checked) {
+    setMode("random");
   }
-  appState = initialState;
+});
+
+ipcRenderer.on("usb-trigger", () => {
   renderUI();
+  playCurrentModeSound("`-toets");
+});
+
+function init() {
+  const loaded = loadSettings();
+  state.mode = loaded.mode;
+  state.fixedSound = loaded.fixedSound;
+  renderUI();
+  saveSettings();
   setStatus("Klaar.", false);
 }
 
-init().catch((error) => {
-  setStatus(`Initialisatie mislukt: ${error.message}`, true);
-});
-
-window.addEventListener("beforeunload", () => {
-  if (typeof removeMainListener === "function") {
-    removeMainListener();
-    removeMainListener = null;
-  }
-});
+init();

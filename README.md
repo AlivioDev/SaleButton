@@ -2,6 +2,9 @@
 
 Eenvoudige Electron desktop-app voor Windows met USB-knop trigger.
 
+> Let op: deze app gebruikt **geen externe API** of internetdienst.
+> Alles draait lokaal binnen dezelfde app-map.
+
 ## Wat de app doet
 
 - Opent 1 venster.
