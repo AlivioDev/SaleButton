@@ -13,6 +13,8 @@ const modeRandomInput = document.getElementById("modeRandom");
 const appStatusText = document.getElementById("appStatus");
 const startupToggleInput = document.getElementById("startupToggle");
 const startupStateText = document.getElementById("startupState");
+const checkUpdatesButton = document.getElementById("checkUpdatesButton");
+const updateStatusText = document.getElementById("updateStatusText");
 const settingsPanel = document.getElementById("settingsPanel");
 const currentModeText = document.getElementById("currentMode");
 const currentFixedSoundText = document.getElementById("currentFixedSound");
@@ -42,6 +44,11 @@ function setStatus(message, isError) {
 
 function showError(message) {
   setStatus(message, true);
+}
+
+function setUpdateStatus(message, isError) {
+  updateStatusText.textContent = `Updates: ${message}`;
+  updateStatusText.classList.toggle("error", Boolean(isError));
 }
 
 function loadSettings() {
@@ -373,6 +380,35 @@ ipcRenderer.on("open-settings", () => {
   startupToggleInput.focus();
 });
 
+ipcRenderer.on("update-status", (_event, payload) => {
+  const updateState = payload && payload.status ? payload.status : "unknown";
+  const version = payload && payload.version ? ` (v${payload.version})` : "";
+
+  switch (updateState) {
+    case "checking-for-update":
+      setUpdateStatus("controleert op updates...", false);
+      break;
+    case "update-available":
+      setUpdateStatus(`update beschikbaar${version}. Kies Nu installeren of Later.`, false);
+      break;
+    case "update-not-available":
+      setUpdateStatus("geen update beschikbaar.", false);
+      break;
+    case "download-progress":
+      setUpdateStatus(`downloaden: ${payload.percent || 0}%`, false);
+      break;
+    case "update-downloaded":
+      setUpdateStatus("update gedownload. Bevestig installatie om te herstarten.", false);
+      break;
+    case "error":
+      setUpdateStatus(`fout: ${payload.message || "onbekend"}`, true);
+      break;
+    default:
+      setUpdateStatus("onbekende update-status.", true);
+      break;
+  }
+});
+
 startupToggleInput.addEventListener("change", async () => {
   try {
     const updatedValue = await ipcRenderer.invoke("set-startup-setting", startupToggleInput.checked);
@@ -381,6 +417,20 @@ startupToggleInput.addEventListener("change", async () => {
   } catch (error) {
     showError(`Kon opstartinstelling niet aanpassen: ${error.message}`);
     renderSummary();
+  }
+});
+
+checkUpdatesButton.addEventListener("click", async () => {
+  try {
+    const result = await ipcRenderer.invoke("check-for-updates");
+    if (!result || !result.ok) {
+      setUpdateStatus(result && result.message ? result.message : "updatecontrole mislukt.", true);
+      return;
+    }
+
+    setUpdateStatus("controle gestart...", false);
+  } catch (error) {
+    setUpdateStatus(`fout: ${error.message}`, true);
   }
 });
 
@@ -406,6 +456,7 @@ async function init() {
   renderUI();
   saveSettings();
   setStatus("", false);
+  setUpdateStatus("nog niet gecontroleerd.", false);
 }
 
 init();
