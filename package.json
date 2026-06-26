@@ -45,6 +45,13 @@
       "icon": "assets/Sale Button.ico",
       "executableName": "SaleButton"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "VUL_HIER_JOUW_GITHUB_GEBRUIKERSNAAM_OF_ORG_IN",
+        "repo": "VUL_HIER_REPOSITORY_NAAM_IN"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -57,5 +64,8 @@
       "uninstallerIcon": "assets/Sale Button.ico",
       "include": "build/installer.nsh"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

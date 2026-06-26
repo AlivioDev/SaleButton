@@ -79,6 +79,22 @@ button.secondary:hover {
   cursor: pointer;
 }
 
+.updates-box {
+  margin-top: 12px;
+}
+
+.muted {
+  color: #4b5563;
+}
+
+#updateStatusText {
+  margin: 10px 0 0;
+}
+
+#updateStatusText.error {
+  color: #991b1b;
+}
+
 .library-header {
   display: flex;
   align-items: center;

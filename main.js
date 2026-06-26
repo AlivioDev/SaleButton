@@ -1,5 +1,15 @@
 const path = require("path");
-const { app, BrowserWindow, globalShortcut, Menu, Tray, ipcMain, nativeImage } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  Menu,
+  Tray,
+  ipcMain,
+  nativeImage,
+  dialog
+} = require("electron");
+const { autoUpdater } = require("electron-updater");
 
 const BACKQUOTE_ACCELERATOR = "`";
 const CHANNELS = {
@@ -8,7 +18,9 @@ const CHANNELS = {
   GET_PAUSE_STATE: "get-pause-state",
   GET_STARTUP_SETTING: "get-startup-setting",
   SET_STARTUP_SETTING: "set-startup-setting",
-  OPEN_SETTINGS: "open-settings"
+  OPEN_SETTINGS: "open-settings",
+  CHECK_FOR_UPDATES: "check-for-updates",
+  UPDATE_STATUS: "update-status"
 };
 
 let mainWindow = null;
@@ -16,6 +28,7 @@ let tray = null;
 let shortcutRegistered = false;
 let isPaused = false;
 let isQuitting = false;
+let updateListenersRegistered = false;
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
@@ -78,6 +91,147 @@ function sendPauseStateToRenderer() {
   mainWindow.webContents.send(CHANNELS.PAUSE_CHANGED, { isPaused });
 }
 
+function logUpdateStatus(status, details = {}) {
+  const payload = {
+    status,
+    ...details
+  };
+
+  console.log(`[updater] ${status}`, details);
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send(CHANNELS.UPDATE_STATUS, payload);
+}
+
+async function askAndDownloadUpdate(updateInfo) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const message = updateInfo && updateInfo.version
+    ? `Versie ${updateInfo.version} is beschikbaar. Nu downloaden en installeren?`
+    : "Er is een update beschikbaar. Nu downloaden en installeren?";
+
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "info",
+    title: "Update beschikbaar",
+    message,
+    buttons: ["Nu installeren", "Later"],
+    cancelId: 1,
+    defaultId: 0,
+    noLink: true
+  });
+
+  if (result.response === 0) {
+    await autoUpdater.downloadUpdate();
+  }
+}
+
+async function askAndInstallDownloadedUpdate() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "question",
+    title: "Update gereed",
+    message: "De update is gedownload. Wil je nu herstarten en installeren?",
+    buttons: ["Nu installeren", "Later"],
+    cancelId: 1,
+    defaultId: 0,
+    noLink: true
+  });
+
+  if (result.response === 0) {
+    isQuitting = true;
+    autoUpdater.quitAndInstall(false, true);
+  }
+}
+
+function setupAutoUpdater() {
+  if (updateListenersRegistered) {
+    return;
+  }
+
+  updateListenersRegistered = true;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  autoUpdater.on("checking-for-update", () => {
+    logUpdateStatus("checking-for-update");
+  });
+
+  autoUpdater.on("update-available", async (info) => {
+    logUpdateStatus("update-available", {
+      version: info && info.version ? info.version : null
+    });
+
+    try {
+      await askAndDownloadUpdate(info);
+    } catch (error) {
+      logUpdateStatus("error", { message: error.message });
+    }
+  });
+
+  autoUpdater.on("update-not-available", (info) => {
+    logUpdateStatus("update-not-available", {
+      version: info && info.version ? info.version : null
+    });
+  });
+
+  autoUpdater.on("download-progress", (progressObj) => {
+    logUpdateStatus("download-progress", {
+      percent: progressObj && typeof progressObj.percent === "number"
+        ? Number(progressObj.percent.toFixed(2))
+        : 0
+    });
+  });
+
+  autoUpdater.on("update-downloaded", async (info) => {
+    logUpdateStatus("update-downloaded", {
+      version: info && info.version ? info.version : null
+    });
+
+    try {
+      await askAndInstallDownloadedUpdate();
+    } catch (error) {
+      logUpdateStatus("error", { message: error.message });
+    }
+  });
+
+  autoUpdater.on("error", (error) => {
+    logUpdateStatus("error", {
+      message: error && error.message ? error.message : "Onbekende updatefout."
+    });
+  });
+}
+
+async function checkForUpdates(triggerSource) {
+  if (!app.isPackaged) {
+    return {
+      ok: false,
+      message: "Updates werken alleen in de geïnstalleerde productieversie."
+    };
+  }
+
+  try {
+    await autoUpdater.checkForUpdates();
+    return {
+      ok: true,
+      message: `Updatecontrole gestart (${triggerSource}).`
+    };
+  } catch (error) {
+    logUpdateStatus("error", { message: error.message });
+    return {
+      ok: false,
+      message: error.message
+    };
+  }
+}
+
 function getStartupSetting() {
   const loginSettings = app.getLoginItemSettings();
   return Boolean(loginSettings.openAtLogin);
@@ -107,6 +261,13 @@ function createAppMenu() {
           click: () => {
             openMainWindow();
             sendOpenSettingsToRenderer();
+          }
+        },
+        {
+          label: "Controleer op updates",
+          click: async () => {
+            openMainWindow();
+            await checkForUpdates("menu");
           }
         },
         { type: "separator" },
@@ -204,6 +365,7 @@ if (hasSingleInstanceLock) {
     ipcMain.handle(CHANNELS.GET_PAUSE_STATE, () => isPaused);
     ipcMain.handle(CHANNELS.GET_STARTUP_SETTING, () => getStartupSetting());
     ipcMain.handle(CHANNELS.SET_STARTUP_SETTING, (_event, enabled) => setStartupSetting(enabled));
+    ipcMain.handle(CHANNELS.CHECK_FOR_UPDATES, () => checkForUpdates("button"));
 
     createAppMenu();
     createWindow();
@@ -213,6 +375,13 @@ if (hasSingleInstanceLock) {
       console.error(`Tray kon niet gestart worden: ${error.message}`);
     }
     registerGlobalBackquoteShortcut();
+
+    setupAutoUpdater();
+
+    if (app.isPackaged) {
+      // Alleen in echte geïnstalleerde app, niet tijdens npm start.
+      checkForUpdates("startup");
+    }
 
     app.on("activate", () => {
       openMainWindow();
