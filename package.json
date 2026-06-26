@@ -48,8 +48,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "VUL_HIER_JOUW_GITHUB_GEBRUIKERSNAAM_OF_ORG_IN",
-        "repo": "VUL_HIER_REPOSITORY_NAAM_IN"
+        "owner": "AlivioDev",
+        "repo": "SaleButton"
       }
     ],
     "nsis": {
