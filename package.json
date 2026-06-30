@@ -18,6 +18,7 @@
   "build": {
     "appId": "com.salebutton.app",
     "productName": "Sale Button",
+    "artifactName": "Sale-Button-Setup-${version}.${ext}",
     "copyright": "Copyright (c) Sale Button",
     "asar": false,
     "directories": {
