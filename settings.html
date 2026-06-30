@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Instellingen - Sale Button</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Instellingen</h1>
+
+      <section id="startupSection" class="panel">
+        <h2>Opstarten met Windows</h2>
+        <label class="settings-toggle">
+          <input id="startupToggle" type="checkbox" />
+          Start Sale Button automatisch met Windows
+        </label>
+      </section>
+
+      <section id="updatesSection" class="panel">
+        <h2>Updates</h2>
+        <div class="library-actions">
+          <button id="checkUpdatesButton" type="button">Controleer op updates</button>
+          <button id="installUpdateButton" type="button" class="secondary">Nu installeren</button>
+        </div>
+        <p id="updateStatusText" class="muted">Updates: nog niet gecontroleerd.</p>
+      </section>
+    </main>
+
+    <script src="./settings.js"></script>
+  </body>
+</html>

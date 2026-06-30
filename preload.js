@@ -1,108 +1,88 @@
 const { contextBridge, ipcRenderer } = require("electron");
-const { IPC_CHANNELS } = require("./ipc-channels");
 
-const INVOKE_TIMEOUT_MS = 2500;
+const CHANNELS = {
+  PLAY_SOUND: "play-sound",
+  PAUSE_CHANGED: "pause-state-changed",
+  UPDATE_STATUS: "update-status",
+  GET_APP_STATE: "get-app-state",
+  REFRESH_SOUNDS: "refresh-sounds",
+  PLAY_CURRENT_MODE: "play-current-mode",
+  PLAY_SPECIFIC_SOUND: "play-specific-sound",
+  SET_MODE: "set-mode",
+  SET_FIXED_SOUND: "set-fixed-sound",
+  ADD_SOUND_FILES: "add-sound-files",
+  DELETE_SOUND: "delete-sound",
+  OPEN_USER_SOUNDS_FOLDER: "open-user-sounds-folder",
+  GET_STARTUP_SETTING: "get-startup-setting",
+  SET_STARTUP_SETTING: "set-startup-setting",
+  CHECK_FOR_UPDATES: "check-for-updates",
+  GET_UPDATE_STATE: "get-update-state",
+  INSTALL_DOWNLOADED_UPDATE: "install-downloaded-update"
+};
 
-function invokeWithTimeout(channel, ...args) {
-  return new Promise((resolve, reject) => {
-    let isDone = false;
-
-    const timer = setTimeout(() => {
-      if (isDone) {
-        return;
-      }
-      isDone = true;
-      reject(new Error(`IPC timeout op kanaal: ${channel}`));
-    }, INVOKE_TIMEOUT_MS);
-
-    ipcRenderer
-      .invoke(channel, ...args)
-      .then((result) => {
-        if (isDone) {
-          return;
-        }
-        isDone = true;
-        clearTimeout(timer);
-        resolve(result);
-      })
-      .catch((error) => {
-        if (isDone) {
-          return;
-        }
-        isDone = true;
-        clearTimeout(timer);
-        reject(error);
-      });
-  });
-}
-
-async function invokeWithFallback(channel, ...args) {
-  try {
-    const syncResult = ipcRenderer.sendSync(`${channel}:sync`, ...args);
-    if (syncResult !== undefined) {
-      return syncResult;
-    }
-  } catch (_syncError) {
-    // Ga door naar invoke-pad.
+function on(channel, callback) {
+  if (typeof callback !== "function") {
+    throw new TypeError("Callback functie is verplicht.");
   }
 
-  try {
-    const invokeResult = await invokeWithTimeout(channel, ...args);
-    if (invokeResult === undefined) {
-      throw new Error(`Lege IPC-respons op kanaal: ${channel}`);
-    }
-    return invokeResult;
-  } catch (invokeError) {
-    try {
-      const syncFallbackResult = ipcRenderer.sendSync(`${channel}:sync`, ...args);
-      if (syncFallbackResult === undefined) {
-        throw new Error(`Lege sync fallback-respons op kanaal: ${channel}`);
-      }
-      return syncFallbackResult;
-    } catch (syncError) {
-      throw new Error(
-        `IPC invoke + fallback mislukt voor ${channel}: ${invokeError.message}; ${syncError.message}`
-      );
-    }
-  }
+  const listener = (_event, payload) => callback(payload);
+  ipcRenderer.on(channel, listener);
+
+  return () => {
+    ipcRenderer.removeListener(channel, listener);
+  };
 }
 
-contextBridge.exposeInMainWorld("electronAPI", {
+contextBridge.exposeInMainWorld("appAPI", {
   getAppState() {
-    return invokeWithFallback(IPC_CHANNELS.GET_APP_STATE);
+    return ipcRenderer.invoke(CHANNELS.GET_APP_STATE);
   },
-  refreshSoundLibrary() {
-    return invokeWithFallback(IPC_CHANNELS.REFRESH_SOUND_LIBRARY);
-  },
-  playSound(filename) {
-    return invokeWithFallback(IPC_CHANNELS.PLAY_SOUND, filename);
+  refreshSounds() {
+    return ipcRenderer.invoke(CHANNELS.REFRESH_SOUNDS);
   },
   playCurrentMode() {
-    return invokeWithFallback(IPC_CHANNELS.PLAY_CURRENT_MODE);
+    return ipcRenderer.invoke(CHANNELS.PLAY_CURRENT_MODE);
+  },
+  playSpecificSound(filename) {
+    return ipcRenderer.invoke(CHANNELS.PLAY_SPECIFIC_SOUND, filename);
   },
   setMode(mode) {
-    return invokeWithFallback(IPC_CHANNELS.SET_MODE, mode);
+    return ipcRenderer.invoke(CHANNELS.SET_MODE, mode);
   },
   setFixedSound(filename) {
-    return invokeWithFallback(IPC_CHANNELS.SET_FIXED_SOUND, filename);
+    return ipcRenderer.invoke(CHANNELS.SET_FIXED_SOUND, filename);
   },
-  /**
-   * Luister veilig naar verzoeken uit het main process.
-   * Geeft een cleanup-functie terug om de listener te verwijderen.
-   */
-  onPlaySoundRequested(callback) {
-    if (typeof callback !== "function") {
-      throw new TypeError("onPlaySoundRequested verwacht een callback-functie.");
-    }
-
-    const listener = (_event, payload) => {
-      callback(payload);
-    };
-
-    ipcRenderer.on(IPC_CHANNELS.PLAY_SOUND, listener);
-
-    return () => {
-      ipcRenderer.removeListener(IPC_CHANNELS.PLAY_SOUND, listener);
-    };
+  addSoundFiles(filePaths) {
+    return ipcRenderer.invoke(CHANNELS.ADD_SOUND_FILES, filePaths);
+  },
+  deleteSound(filename) {
+    return ipcRenderer.invoke(CHANNELS.DELETE_SOUND, filename);
+  },
+  openUserSoundsFolder() {
+    return ipcRenderer.invoke(CHANNELS.OPEN_USER_SOUNDS_FOLDER);
+  },
+  getStartupSetting() {
+    return ipcRenderer.invoke(CHANNELS.GET_STARTUP_SETTING);
+  },
+  setStartupSetting(enabled) {
+    return ipcRenderer.invoke(CHANNELS.SET_STARTUP_SETTING, enabled);
+  },
+  checkForUpdates() {
+    return ipcRenderer.invoke(CHANNELS.CHECK_FOR_UPDATES);
+  },
+  getUpdateState() {
+    return ipcRenderer.invoke(CHANNELS.GET_UPDATE_STATE);
+  },
+  installDownloadedUpdate() {
+    return ipcRenderer.invoke(CHANNELS.INSTALL_DOWNLOADED_UPDATE);
+  },
+  onPlaySound(callback) {
+    return on(CHANNELS.PLAY_SOUND, callback);
+  },
+  onPauseChanged(callback) {
+    return on(CHANNELS.PAUSE_CHANGED, callback);
+  },
+  onUpdateStatus(callback) {
+    return on(CHANNELS.UPDATE_STATUS, callback);
   }
 });
