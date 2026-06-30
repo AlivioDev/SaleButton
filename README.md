@@ -8,21 +8,29 @@ Eenvoudige Electron desktop-app voor Windows met USB-knop trigger.
 ## Wat de app doet
 
 - Opent 1 venster.
-- Leest automatisch alle `.mp3`-bestanden uit `./sounds`.
+- Leest automatisch alle `.mp3`-bestanden uit de gebruikers-geluidsmap.
 - Toont een geluidsbibliotheek met per bestand:
   - bestandsnaam
   - **Play/Test** knop
   - **Instellen als vast geluid** knop
 - Heeft een knop **MP3 toevoegen** waarmee de gebruiker via de Windows bestandskiezer
-  MP3-bestanden direct naar `./sounds` kopieert.
+  MP3-bestanden direct naar de gebruikers-geluidsmap kopieert.
 - Speelt hetzelfde geluid af als je op de **`**-toets drukt, ook als het app-venster
   niet actief is (via Electron `globalShortcut`).
 - Ondersteunt 2 modi:
   - **Vast geluid** (gekozen bestand)
-  - **Random** (willekeurig bestand uit `./sounds`)
-- Slaat modus + vast geluid op in `settings.json`.
+  - **Random** (willekeurig bestand uit de gebruikers-geluidsmap)
+- Slaat modus + vast geluid op in `app.getPath("userData")/settings.json`.
 - Draait in systeemvak (tray): sluiten met **X** verbergt de app i.p.v. volledig afsluiten.
-- Via **File > Instellingen** kun je **Start met Windows** aan/uit zetten.
+- Via **File > Instellingen** open je een apart instellingenvenster.
+- Via **File > Controleer op updates** open je het updatevenster.
+
+## Geluidsopslag
+
+- Meegeleverde sounds staan in `./default-sounds` (alleen app/installatie).
+- Gebruikerssounds staan in `app.getPath("userData")/sounds`.
+- Bij eerste start worden default sounds eenmalig gekopieerd naar de gebruikersmap.
+- Daarna wordt niet meer automatisch gesynchroniseerd, zodat verwijderde gebruikersbestanden weg blijven.
 
 ## Projectstructuur
 
@@ -30,14 +38,18 @@ Eenvoudige Electron desktop-app voor Windows met USB-knop trigger.
 .
 ├── index.html
 ├── main.js
+├── preload.js
 ├── renderer.js
+├── settings.html
+├── settings.js
 ├── assets/
 │   └── Sale Button.ico
-├── settings.json (runtime, lokaal)
+├── default-sounds/
+│   └── *.mp3
 ├── styles.css
 ├── package.json
-└── sounds/
-    └── *.mp3
+└── build/
+    └── installer.nsh
 ```
 
 ## Exacte Windows terminalcommando's om te starten

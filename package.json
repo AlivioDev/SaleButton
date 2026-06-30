@@ -1,6 +1,6 @@
 {
   "name": "sale-button",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Callcenter sale soundboard",
   "main": "main.js",
   "scripts": {
@@ -26,10 +26,13 @@
     },
     "files": [
       "main.js",
+      "preload.js",
       "index.html",
       "renderer.js",
+      "settings.html",
+      "settings.js",
       "styles.css",
-      "sounds/**/*",
+      "default-sounds/**/*",
       "assets/**/*",
       "package.json"
     ],
